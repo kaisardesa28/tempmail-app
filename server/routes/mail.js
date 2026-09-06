@@ -184,8 +184,9 @@ router.get('/messages', async (req, res) => {
     }
 
     const headers = {
-      ...getMailTmHeaders(),
-      'Authorization': authHeader
+      'Authorization': authHeader,
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     };
 
     const response = await fetchWithTimeout(`${MAILTM_API}/messages?page=1`, { headers });
@@ -243,8 +244,9 @@ router.get('/messages/:id', async (req, res) => {
     }
 
     const headers = {
-      ...getMailTmHeaders(),
-      'Authorization': authHeader
+      'Authorization': authHeader,
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     };
 
     const messageId = req.params.id;
