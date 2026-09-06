@@ -191,7 +191,14 @@ router.get('/messages', async (req, res) => {
     const response = await fetchWithTimeout(`${MAILTM_API}/messages?page=1`, { headers });
 
     if (!response.ok) {
-      return res.json({ success: true, total: 0, messages: [] });
+      const errTxt = await response.text().catch(() => '');
+      return res.json({
+        success: false,
+        error: `Mail.tm status: ${response.status}`,
+        debugText: errTxt,
+        total: 0,
+        messages: []
+      });
     }
 
     const data = await response.json();
