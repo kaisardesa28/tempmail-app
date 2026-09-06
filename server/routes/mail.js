@@ -123,9 +123,9 @@ router.post('/account', async (req, res) => {
     }
 
     if (!createData) {
-      const errJson = await createRes.json().catch(() => ({}));
-      return res.status(createRes.status).json({
-        error: errJson.message || 'Gagal membuat akun email di domain @uberip.com. Silakan coba lagi.'
+      const errText = createRes ? await createRes.text().catch(() => '') : 'no response';
+      return res.status(createRes ? createRes.status : 500).json({
+        error: `Mail.tm error [${createRes ? createRes.status : 0}]: ${errText || 'Gagal membuat akun email di domain @uberip.com.'}`
       });
     }
 
