@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TempMail - Email Sementara Siap Pakai &amp; Bebas Spam</title>
+  <meta name="description" content="Layanan email sementara gratis dan aktif siap pakai untuk verifikasi akun, kode OTP, dan melindungi privasi email asli Anda dari spam.">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col min-h-screen selection:bg-indigo-500 selection:text-white">
+
+  <!-- Background Ambient Glow -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[380px] bg-indigo-600/20 blur-[140px] rounded-full"></div>
+    <div class="absolute top-1/3 -right-40 w-[450px] h-[450px] bg-purple-600/10 blur-[130px] rounded-full"></div>
+    <div class="absolute bottom-10 -left-40 w-[450px] h-[450px] bg-sky-600/10 blur-[130px] rounded-full"></div>
+  </div>
+
+  <!-- Header / Navbar -->
+  <header class="sticky top-0 z-30 glass-panel border-b border-slate-800/80">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3 cursor-pointer select-none" onclick="location.reload()">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-extrabold tracking-tight flex items-center gap-2">
+            <span class="gradient-text text-lg">TempMail</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Siap Pakai</span>
+            </span>
+          </h1>
+          <p class="text-[10px] text-slate-400 hidden sm:block">Email Sementara Gratis &amp; Bebas Spam</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-3">
+        <button id="sound-toggle-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors" title="Pengaturan Suara Notifikasi">
+          <i data-lucide="volume-2" class="w-4 h-4 text-indigo-400"></i>
+          <span class="hidden sm:inline text-xs text-slate-300 font-medium">Suara Aktif</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 z-10 flex flex-col gap-6">
+
+    <!-- Hero Email Display Card -->
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl gradient-border shadow-2xl relative overflow-hidden">
+      <div class="flex flex-col items-center text-center gap-4 max-w-2xl mx-auto">
+        
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>Kotak Masuk Email Anda Sedang Aktif</span>
+        </div>
+
+        <!-- Email Address Display Box -->
+        <div class="w-full relative group mt-1">
+          <div class="flex items-center justify-between gap-3 bg-slate-900/90 border border-slate-700/80 hover:border-indigo-500/60 p-2.5 sm:p-3.5 rounded-2xl shadow-inner transition-all">
+            <div class="flex items-center gap-3 min-w-0 pl-2">
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                <i data-lucide="mail" class="w-4 h-4"></i>
+              </div>
+              <span id="current-email-display" class="font-mono text-base sm:text-xl font-bold tracking-wide text-slate-100 truncate select-all">
+                membuat_email...
+              </span>
+            </div>
+            <button id="copy-email-btn" class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-600/30 active:scale-95 transition-all flex-shrink-0">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+              <span>Salin</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-center flex-wrap gap-2 sm:gap-3 w-full pt-2">
+          <button id="change-email-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition-colors">
+            <i data-lucide="refresh-cw" class="w-4 h-4 text-indigo-400"></i>
+            <span>Ganti Acak</span>
+          </button>
+          <button id="custom-email-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition-colors">
+            <i data-lucide="edit-3" class="w-4 h-4 text-sky-400"></i>
+            <span>Kustom Username</span>
+          </button>
+          <button id="qr-email-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200 text-xs sm:text-sm font-medium transition-colors">
+            <i data-lucide="qr-code" class="w-4 h-4 text-emerald-400"></i>
+            <span>QR Code</span>
+          </button>
+          <button id="delete-mailbox-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 text-xs sm:text-sm font-medium transition-colors">
+            <i data-lucide="trash-2" class="w-4 h-4 text-rose-400"></i>
+            <span>Hapus / Reset</span>
+          </button>
+        </div>
+
+        <!-- Countdown Progress Bar -->
+        <div class="w-full max-w-md mt-2">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="refresh-cw" class="w-3 h-3 text-indigo-400 animate-spin"></i>
+              <span>Memeriksa email baru secara otomatis</span>
+            </span>
+            <span id="mail-countdown-text" class="font-mono font-semibold text-indigo-400">10s</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="mail-progress-bar" class="progress-bar-fill h-full bg-gradient-to-r from-indigo-500 to-sky-400 w-0"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Inbox List Container -->
+    <div class="glass-panel rounded-3xl p-6 border border-slate-800/80 shadow-xl">
+      <div class="flex items-center justify-between pb-5 border-b border-slate-800/80">
+        <div class="flex items-center gap-3">
+          <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i data-lucide="inbox" class="w-5 h-5 text-indigo-400"></i>
+            <span>Kotak Masuk</span>
+          </h3>
+          <span id="mail-count-badge" class="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold border border-indigo-500/30">0</span>
+        </div>
+        <button id="refresh-email-btn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold transition-colors">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+          <span>Refresh Sekarang</span>
+        </button>
+      </div>
+
+      <!-- Messages List -->
+      <div id="mail-list-container" class="flex flex-col gap-3 mt-4">
+        <!-- Rendered via mail.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="mail-empty-state" class="py-16 text-center flex flex-col items-center justify-center gap-3">
+        <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-2">
+          <i data-lucide="mail-search" class="w-8 h-8 animate-pulse-subtle"></i>
+        </div>
+        <h4 class="text-base font-semibold text-slate-200">Belum ada email masuk</h4>
+        <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
+          Salin alamat email di atas lalu gunakan untuk mendaftar akun atau coba kirim email ke alamat tersebut. Pesan akan langsung muncul secara otomatis di sini.
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================== -->
+  <!-- MODALS -->
+  <!-- ============================================== -->
+
+  <!-- 1. Custom Email Modal -->
+  <div id="custom-email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-slide-down">
+    <div class="glass-panel w-full max-w-md p-6 rounded-3xl border border-slate-700 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-5 h-5 text-indigo-400"></i>
+          <span>Kustom Alamat Email</span>
+        </h3>
+        <button data-close-modal="custom-email-modal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="custom-email-form" class="mt-4 flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Username Email</label>
+          <input type="text" id="custom-username-input" placeholder="contoh: akun_kerja99" required pattern="[a-zA-Z0-9._-]+" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-indigo-500">
+          <p class="text-[11px] text-slate-400 mt-1">Hanya huruf, angka, titik, strip, dan underscore.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilih Domain</label>
+          <select id="custom-domain-select" class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="uberip.com">@uberip.com</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" data-close-modal="custom-email-modal" class="px-4 py-2 rounded-xl text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-colors">Batal</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all">Buat Email</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. QR Code Modal -->
+  <div id="qr-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-slide-down">
+    <div class="glass-panel w-full max-w-sm p-6 rounded-3xl border border-slate-700 shadow-2xl text-center relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="qr-code" class="w-5 h-5 text-emerald-400"></i>
+          <span>Scan Alamat Email</span>
+        </h3>
+        <button data-close-modal="qr-modal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl inline-block shadow-inner mb-3">
+        <div id="qr-code-container"></div>
+      </div>
+
+      <p id="qr-email-text" class="font-mono text-xs text-slate-300 font-semibold break-all px-2"></p>
+      <p class="text-[11px] text-slate-500 mt-1">Scan QR ini dengan kamera HP Anda untuk menyalin email</p>
+    </div>
+  </div>
+
+  <!-- 3. Message Detail Modal -->
+  <div id="message-detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-slide-down">
+    <div class="glass-panel w-full max-w-3xl max-h-[90vh] flex flex-col p-6 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+          <i data-lucide="mail-open" class="w-5 h-5"></i>
+          <span>Detail Pesan Email</span>
+        </div>
+        <button data-close-modal="message-detail-modal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Scrollable Message Body -->
+      <div id="message-detail-content" class="overflow-y-auto flex-1 py-4 pr-1">
+        <!-- Rendered via mail.js -->
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Footer -->
+  <footer class="mt-auto py-6 border-t border-slate-800/60 text-center text-xs text-slate-500 z-10">
+    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p>&copy; 2026 TempMail. Cepat, Aman, dan Menjaga Privasi Email Anda.</p>
+      <div class="flex items-center gap-4 text-slate-400">
+        <span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Server Aktif (@uberip.com)</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/app.js"></script>
+  <script src="/js/mail.js"></script>
+</body>
+</html>
