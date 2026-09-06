@@ -35,21 +35,29 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
 
 // 1. Get available domains (Locked to uberip.com)
 router.get('/domains', async (req, res) => {
+  return res.json({ domains: ['uberip.com'] });
+});
+
+// Debug endpoint to test raw Mail.tm call from Vercel
+router.get('/debug', async (req, res) => {
   try {
-    const ip = getRotatedIp(req);
-    const response = await fetchWithTimeout(`${MAILTM_API}/domains`, {
-      headers: { 'X-Forwarded-For': ip, 'Client-IP': ip }
+    const testEmail = 'vtest_' + Date.now().toString(36) + '@uberip.com';
+    const response = await fetch(`${MAILTM_API}/accounts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ address: testEmail, password: 'Password123!' })
     });
-    if (response.ok) {
-      const data = await response.json();
-      const domains = (data['hydra:member'] || []).filter(d => d.isActive).map(d => d.domain);
-      if (domains.length > 0) {
-        return res.json({ domains });
-      }
-    }
-    return res.json({ domains: ['uberip.com'] });
-  } catch (error) {
-    return res.json({ domains: ['uberip.com'] });
+    const text = await response.text();
+    return res.json({
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: text
+    });
+  } catch (err) {
+    return res.json({ error: err.message });
   }
 });
 
