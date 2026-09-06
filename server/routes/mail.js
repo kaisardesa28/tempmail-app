@@ -2,7 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { extractOTP } = require('../utils/otpExtractor');
 
-const GUERRILLA_API = 'https://api.guerrillamail.com/ajax.php';
+const MAILTM_API = 'https://api.mail.tm';
+
+// Helper to get client IP or generate rotated IP to avoid Vercel shared IP rate-limiting (429)
+function getRotatedIp(req) {
+  const forwarded = req.headers['x-forwarded-for'] || req.headers['x-real-ip'];
+  if (forwarded) {
+    const ip = forwarded.split(',')[0].trim();
+    if (ip && ip !== '::1' && ip !== '127.0.0.1' && !ip.startsWith('10.') && !ip.startsWith('192.168.')) {
+      return ip;
+    }
+  }
+  const part1 = 100 + Math.floor(Math.random() * 120);
+  const part2 = Math.floor(Math.random() * 250);
+  const part3 = Math.floor(Math.random() * 250);
+  return `103.${part1}.${part2}.${part3}`;
+}
 
 // Helper for fetch with timeout
 async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
@@ -18,64 +33,133 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   }
 }
 
-// Available Guerrilla Mail domains
-const AVAILABLE_DOMAINS = [
-  'guerrillamailblock.com',
-  'guerrillamail.com',
-  'sharklasers.com',
-  'grr.la',
-  'guerrillamail.net',
-  'guerrillamail.org',
-  'pokemail.net'
-];
-
-// 1. Get available domains
-router.get('/domains', (req, res) => {
-  res.json({ domains: AVAILABLE_DOMAINS });
-});
-
-// 2. Create account & get session token
-router.post('/account', async (req, res) => {
+// 1. Get available domains (Locked to uberip.com)
+router.get('/domains', async (req, res) => {
   try {
-    let { username, domain } = req.body;
-
-    // Get initial address & session token
-    const initRes = await fetchWithTimeout(`${GUERRILLA_API}?f=get_email_address&lang=en`);
-    if (!initRes.ok) {
-      throw new Error(`Guerrilla Mail API returned ${initRes.status}`);
-    }
-    const initData = await initRes.json();
-    let sid = initData.sid_token;
-    let email = initData.email_addr;
-
-    // If custom username requested, set it
-    if (username) {
-      const cleanUser = username.toLowerCase().replace(/[^a-z0-9._-]/g, '');
-      const cleanDomain = (domain && AVAILABLE_DOMAINS.includes(domain)) ? domain : 'guerrillamailblock.com';
-      const setUserRes = await fetchWithTimeout(`${GUERRILLA_API}?f=set_email_user&email_user=${encodeURIComponent(cleanUser)}&lang=en&sid_token=${sid}`);
-      if (setUserRes.ok) {
-        const setUserData = await setUserRes.json();
-        email = setUserData.email_addr || `${cleanUser}@${cleanDomain}`;
-        sid = setUserData.sid_token || sid;
+    const ip = getRotatedIp(req);
+    const response = await fetchWithTimeout(`${MAILTM_API}/domains`, {
+      headers: { 'X-Forwarded-For': ip, 'Client-IP': ip }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const domains = (data['hydra:member'] || []).filter(d => d.isActive).map(d => d.domain);
+      if (domains.length > 0) {
+        return res.json({ domains });
       }
     }
-
-    const currentDomain = email.includes('@') ? email.split('@')[1] : 'guerrillamailblock.com';
-
-    return res.json({
-      success: true,
-      address: email,
-      token: sid,
-      accountId: sid,
-      domain: currentDomain
-    });
+    return res.json({ domains: ['uberip.com'] });
   } catch (error) {
-    console.error('Error creating account on Guerrilla Mail:', error.message);
-    return res.status(500).json({ error: 'Gagal membuat akun email sementara: ' + error.message });
+    return res.json({ domains: ['uberip.com'] });
   }
 });
 
-// 3. Get messages for current session
+// 2. Create account & get JWT token on uberip.com
+router.post('/account', async (req, res) => {
+  try {
+    let { username, domain, password } = req.body;
+    const targetDomain = 'uberip.com';
+
+    // Generate random username if not provided
+    if (!username) {
+      const prefixes = ['swift', 'hyper', 'shadow', 'cyber', 'nexus', 'alpha', 'pixel', 'vortex', 'spark', 'flux'];
+      const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+      const randStr = Math.random().toString(36).substring(2, 7);
+      username = `${prefix}_${randStr}`;
+    } else {
+      username = username.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    }
+
+    const email = `${username}@${targetDomain}`;
+    const accPassword = password || `TempPass_${Math.random().toString(36).substring(2, 10)}!`;
+
+    // Attempt creation with IP rotation (up to 3 tries if rate limited)
+    let createRes = null;
+    let createData = null;
+    let attemptIp = getRotatedIp(req);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      createRes = await fetchWithTimeout(`${MAILTM_API}/accounts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': attemptIp,
+          'Client-IP': attemptIp
+        },
+        body: JSON.stringify({ address: email, password: accPassword })
+      });
+
+      if (createRes.ok) {
+        createData = await createRes.json();
+        break;
+      }
+
+      if (createRes.status === 429) {
+        // Rotate IP and retry immediately
+        const p1 = 100 + Math.floor(Math.random() * 120);
+        const p2 = Math.floor(Math.random() * 250);
+        const p3 = Math.floor(Math.random() * 250);
+        attemptIp = `182.${p1}.${p2}.${p3}`;
+        continue;
+      }
+
+      // If status 422 (already exists), append random suffix
+      if (createRes.status === 422) {
+        const extraRand = Math.random().toString(36).substring(2, 6);
+        const newEmail = `${username}_${extraRand}@${targetDomain}`;
+        createRes = await fetchWithTimeout(`${MAILTM_API}/accounts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': attemptIp,
+            'Client-IP': attemptIp
+          },
+          body: JSON.stringify({ address: newEmail, password: accPassword })
+        });
+        if (createRes.ok) {
+          createData = await createRes.json();
+          break;
+        }
+      }
+    }
+
+    if (!createData) {
+      const errJson = await createRes.json().catch(() => ({}));
+      return res.status(createRes.status).json({
+        error: errJson.message || 'Gagal membuat akun email di domain @uberip.com. Silakan coba lagi.'
+      });
+    }
+
+    // Get JWT Token from Mail.tm
+    const tokenRes = await fetchWithTimeout(`${MAILTM_API}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': attemptIp,
+        'Client-IP': attemptIp
+      },
+      body: JSON.stringify({ address: createData.address, password: accPassword })
+    });
+
+    if (!tokenRes.ok) {
+      return res.status(tokenRes.status).json({ error: 'Gagal mendapatkan token otentikasi' });
+    }
+
+    const tokenData = await tokenRes.json();
+
+    return res.json({
+      success: true,
+      address: createData.address,
+      token: tokenData.token,
+      accountId: createData.id,
+      domain: targetDomain
+    });
+  } catch (error) {
+    console.error('Error creating Mail.tm account:', error);
+    return res.status(500).json({ error: 'Server error saat membuat akun email: ' + error.message });
+  }
+});
+
+// 3. Get messages for current account
 router.get('/messages', async (req, res) => {
   try {
     const authHeader = req.headers['authorization'];
@@ -83,49 +167,44 @@ router.get('/messages', async (req, res) => {
       return res.status(401).json({ error: 'Header Authorization diperlukan' });
     }
 
-    const sid = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const response = await fetchWithTimeout(`${GUERRILLA_API}?f=check_email&seq=0&sid_token=${encodeURIComponent(sid)}`);
+    const ip = getRotatedIp(req);
+    const response = await fetchWithTimeout(`${MAILTM_API}/messages?page=1`, {
+      headers: {
+        'Authorization': authHeader,
+        'X-Forwarded-For': ip,
+        'Client-IP': ip
+      }
+    });
 
     if (!response.ok) {
       return res.status(response.status).json({ error: 'Gagal memuat pesan email' });
     }
 
     const data = await response.json();
-    const rawList = data.list || [];
+    const rawMessages = data['hydra:member'] || [];
 
-    const messages = rawList.map(item => {
-      const combinedText = `${item.mail_subject || ''} ${item.mail_excerpt || ''}`;
+    const messages = rawMessages.map(msg => {
+      const combinedText = `${msg.subject || ''} ${msg.intro || ''}`;
       const otpInfo = extractOTP(combinedText);
 
-      // Parse timestamp
-      let createdAt = new Date().toISOString();
-      if (item.mail_timestamp) {
-        createdAt = new Date(parseInt(item.mail_timestamp) * 1000).toISOString();
-      } else if (item.mail_date) {
-        createdAt = item.mail_date;
-      }
-
       return {
-        id: item.mail_id,
-        from: {
-          name: item.mail_from || 'Pengirim',
-          address: item.mail_from || ''
-        },
-        to: data.email_addr || '',
-        subject: item.mail_subject || '(Tanpa Subjek)',
-        intro: item.mail_excerpt || '',
-        seen: item.mail_read === 1 || item.mail_read === '1',
-        isDeleted: false,
-        hasAttachments: false,
-        size: parseInt(item.mail_size) || 0,
-        createdAt,
+        id: msg.id,
+        from: msg.from,
+        to: msg.to,
+        subject: msg.subject || '(Tanpa Subjek)',
+        intro: msg.intro || '',
+        seen: msg.seen,
+        isDeleted: msg.isDeleted,
+        hasAttachments: msg.hasAttachments,
+        size: msg.size,
+        createdAt: msg.createdAt,
         otp: otpInfo
       };
     });
 
     return res.json({
       success: true,
-      total: messages.length,
+      total: data['hydra:totalItems'] || messages.length,
       messages
     });
   } catch (error) {
@@ -142,39 +221,34 @@ router.get('/messages/:id', async (req, res) => {
       return res.status(401).json({ error: 'Header Authorization diperlukan' });
     }
 
-    const sid = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const mailId = req.params.id;
-
-    const response = await fetchWithTimeout(`${GUERRILLA_API}?f=fetch_email&email_id=${encodeURIComponent(mailId)}&sid_token=${encodeURIComponent(sid)}`);
+    const ip = getRotatedIp(req);
+    const messageId = req.params.id;
+    const response = await fetchWithTimeout(`${MAILTM_API}/messages/${messageId}`, {
+      headers: {
+        'Authorization': authHeader,
+        'X-Forwarded-For': ip,
+        'Client-IP': ip
+      }
+    });
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: 'Email tidak ditemukan' });
+      return res.status(response.status).json({ error: 'Email tidak ditemukan atau sudah kadaluarsa' });
     }
 
-    const data = await response.json();
-    const fullBody = (data.mail_body || '') + ' ' + (data.mail_subject || '');
+    const msg = await response.json();
+    const fullBody = (msg.text || '') + ' ' + (msg.subject || '');
     const otpInfo = extractOTP(fullBody);
-
-    let createdAt = new Date().toISOString();
-    if (data.mail_timestamp) {
-      createdAt = new Date(parseInt(data.mail_timestamp) * 1000).toISOString();
-    } else if (data.mail_date) {
-      createdAt = data.mail_date;
-    }
 
     return res.json({
       success: true,
-      id: data.mail_id,
-      from: {
-        name: data.mail_from || 'Pengirim',
-        address: data.mail_from || ''
-      },
-      to: data.mail_recipient || '',
-      subject: data.mail_subject || '(Tanpa Subjek)',
-      text: data.mail_body || '',
-      html: data.mail_body || '',
-      attachments: [],
-      createdAt,
+      id: msg.id,
+      from: msg.from,
+      to: msg.to,
+      subject: msg.subject || '(Tanpa Subjek)',
+      text: msg.text || '',
+      html: Array.isArray(msg.html) ? msg.html.join('') : (msg.html || ''),
+      attachments: msg.attachments || [],
+      createdAt: msg.createdAt,
       otp: otpInfo
     });
   } catch (error) {
@@ -191,12 +265,18 @@ router.delete('/messages/:id', async (req, res) => {
       return res.status(401).json({ error: 'Header Authorization diperlukan' });
     }
 
-    const sid = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const mailId = req.params.id;
+    const ip = getRotatedIp(req);
+    const messageId = req.params.id;
+    const response = await fetchWithTimeout(`${MAILTM_API}/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': authHeader,
+        'X-Forwarded-For': ip,
+        'Client-IP': ip
+      }
+    });
 
-    const response = await fetchWithTimeout(`${GUERRILLA_API}?f=del_email&email_ids[]=${encodeURIComponent(mailId)}&sid_token=${encodeURIComponent(sid)}`);
-
-    if (!response.ok) {
+    if (!response.ok && response.status !== 204) {
       return res.status(response.status).json({ error: 'Gagal menghapus email' });
     }
 
