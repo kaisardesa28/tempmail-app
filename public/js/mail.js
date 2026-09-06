@@ -263,6 +263,13 @@ const MailApp = {
             <span class="text-[10px] bg-amber-500/20 px-1 py-0.5 rounded cursor-pointer hover:bg-amber-500/40">Salin</span>
           </div>
         `;
+      } else if (msg.otp && msg.otp.link) {
+        otpBadge = `
+          <div class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs font-semibold">
+            <i data-lucide="link" class="w-3.5 h-3.5"></i>
+            <span>Konfirmasi Email</span>
+          </div>
+        `;
       }
 
       return `
@@ -334,6 +341,24 @@ const MailApp = {
               <i data-lucide="copy" class="w-4 h-4"></i>
               <span>Salin OTP</span>
             </button>
+          </div>
+        `;
+      } else if (data.otp && data.otp.link) {
+        otpSection = `
+          <div class="p-4 bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border border-emerald-500/40 rounded-xl mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Tautan Konfirmasi Akun</p>
+                <p class="text-xs text-slate-300 mt-0.5">Email ini berisi tautan verifikasi/aktivasi akun Anda.</p>
+              </div>
+            </div>
+            <a href="${data.otp.link}" target="_blank" rel="noopener noreferrer" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all flex-shrink-0">
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+              <span>Buka Tautan Verifikasi</span>
+            </a>
           </div>
         `;
       }

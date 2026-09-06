@@ -36,6 +36,13 @@ function extractOTP(text) {
     /\b([0-9]{4,8})\b/
   ];
 
+  // Detect verification links (e.g. TunnelBear, Twitter, Discord, etc.)
+  let verificationLink = null;
+  const linkMatches = text.match(/https?:\/\/[^\s"'<>\)]+(?:verify|confirm|activate|validation|token=|key=)[^\s"'<>\)]*/i);
+  if (linkMatches && linkMatches[0]) {
+    verificationLink = linkMatches[0].replace(/[\.,\);]+$/, '');
+  }
+
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
@@ -46,12 +53,17 @@ function extractOTP(text) {
       }
       return {
         code,
-        service: detectedService
+        service: detectedService,
+        link: verificationLink
       };
     }
   }
 
-  return detectedService ? { code: null, service: detectedService } : null;
+  return {
+    code: null,
+    service: detectedService,
+    link: verificationLink
+  };
 }
 
 module.exports = { extractOTP };

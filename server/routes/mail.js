@@ -195,7 +195,7 @@ router.get('/messages', async (req, res) => {
     }
 
     const data = await response.json();
-    const rawMessages = data['hydra:member'] || [];
+    const rawMessages = Array.isArray(data) ? data : (data['hydra:member'] || []);
 
     const messages = rawMessages.map(msg => {
       const combinedText = `${msg.subject || ''} ${msg.intro || ''}`;
@@ -218,7 +218,7 @@ router.get('/messages', async (req, res) => {
 
     return res.json({
       success: true,
-      total: data['hydra:totalItems'] || messages.length,
+      total: Array.isArray(data) ? data.length : (data['hydra:totalItems'] || messages.length),
       messages
     });
   } catch (error) {
